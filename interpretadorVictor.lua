@@ -1,16 +1,14 @@
--------------------------------Variaveis globais----------------------------
+-------------------------------Variaveis globais--------------------------------------------------------------------------------
 linhas = {}
 functionsTable = {}
-----------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------
 
 
--------------------------------Declaração das funções----------------------------
-
+-------------------------------Declaração das funções--------------------------------------------------------------------------
 --Abre o arquivo e salva ele localmente na variavel global linhas
 function prepareFile()
-	--
 	-- Pega o nome do arquivo passado como parâmetro (se houver)
-	--
 	local filename = "teste1.bpl"
 	if not filename then
 	   print("Usage: lua interpretador.lua <prog.bpl>")
@@ -28,25 +26,35 @@ function prepareFile()
 	file:close()
 end	
 
---Salva o arquivo na variavel global linhas
+--Salva o arquivo na variavel global linhas. Observe que ele será salvo com os comentários removidos
 function saveFile(file)
 	for line in file do
-		linhas[#linhas + 1] = line
+		linhas[#linhas + 1] = removeComments(line)
 	end
 end
 
 --Procura pelas funções existentes no programa e salva na tabela 
 function identifyFunctions()
 	for i = 1, #linhas do 
-  		if string.find(linhas[i], "function") ~= nil then
-			--Pego tudo depois do espaço em branco após a palavra "function" até o primeiro caracter "("
-			local functionName = string.match(linhas[i], " [^%(]*")
-			--Removo o espaço em branco
-			functionName = string.sub(functionName, 2)
-			functionsTable[#functionsTable + 1] = { ["name"] = functionName, ["pos"] = i}
+  		if string.find(linhas[i], "function") ~= nil then			
+			functionsTable[#functionsTable + 1] = { ["name"] = getFunctionName(linhas[i]), ["pos"] = i}
 		end
 	end
 end
+
+function removeComments(line)
+	return string.match(line, "[^//]*")
+end
+
+function getFunctionName(line)
+	--Pego tudo depois do espaço em branco após a palavra "function" até o primeiro caracter "("
+	local functionName = string.match(line, " [^%(]*")
+	--Removo o espaço em branco que restou no inicio da string 
+	functionName = string.sub(functionName, 2)
+	return functionName
+end
+
+
 
 --Imprime o conteúdo da tabela de funções
 function printfunctionsTable()
@@ -62,14 +70,15 @@ function preProcessing()
 	identifyFunctions()
 	printfunctionsTable()
 end
+-------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------
 
 
-
-
--------------------------------Programa principal----------------------------
+------------------------Execução do Programa principal-------------------------------------------------------------------------
 preProcessing()
 
 
 
 
-----------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------
