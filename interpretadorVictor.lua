@@ -107,18 +107,25 @@ end
 
 --Retorna uma lista com o nome das variaveis simples e dos vetores (nesse caso salva o tamanho do vetor)
 function getVariablesList(lineNumber)
-	local variablesAndValues = {}
+	local simpleVariables = {}
+	local vectorVariables ={}
 	local i = lineNumber
 	--Se não há "begin" quer dizer que a contém as declarações das variáveis
 	while (not isThere_BEGIN_InThisLine(i)) do
 
 		if (isVariableANumber(i)) then
 			local nameField = getVariableName(i)
-			print(nameField)
+			--Como na declaração da variável não há valor iremos iniciar com nil
+			local value = nil
+
+			simpleVariables.nameField = value
+			--print(#simpleVariables, simpleVariables.nameField, simpleVariables)
 		else
 			local nameField = getVariableName(i)
 			local vectorSize = getVectorSize(i)
-			print(nameField, vectorSize)
+			
+			vectorVariables.nameField = {size = vectorSize, values = {}}
+			--print(vectorVariables.nameField.size, vectorVariables.nameField.values)
 		end
 
 		i = i + 1
