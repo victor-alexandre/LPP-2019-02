@@ -117,7 +117,7 @@ end
 --Abre o arquivo e salva ele localmente na variavel global progLines
 function prepareFile()
 	-- Pega o nome do arquivo passado como parâmetro (se houver)
-	local filename = "./testes/teste5.bpl"
+	local filename = "./testes/teste8.bpl"
 	if not filename then
 	   print("Usage: lua interpretador.lua <prog.bpl>")
 	   os.exit(1)
@@ -188,13 +188,39 @@ function executeFunctionBody(bodyBegin, bodyEnd)
 			resolveComparation(lineNumber)
 		elseif verifyAction(lineNumber) == "functionCall" then
 			resolveFunctionCall(lineNumber)
+		else
+			print("Erro na execução do corpo")
 		end
 	end
 end
 
+--Verifica qual é a ação (atribuição, chamada de função, ou comparação)presente na linha 
 function verifyAction(lineNumber)
+	local myStr = progLines[lineNumber]
+	if string.match(myStr, " = ") == " = " then
+		return "attribuition"
+	elseif string.match(myStr, "if ") == "if " then
+		return "comparation"
+	elseif string.match(myStr, "%(") == "(" then
+		return "functionCall"
+	else
+		return "error"
+	end
+end
 
+--Resolve atribuição
+function resolveAttribuition(lineNumber)
+	print(progLines[lineNumber], "atribuição")
+end
 
+--Resolve comparação (IF-ELSE)
+function resolveComparation(lineNumber)
+	print(progLines[lineNumber], "comparação")
+end
+
+--Resolve chamada de função
+function resolveFunctionCall(lineNumber)
+	print(progLines[lineNumber], "chamada de função")
 end
 
 --Inicializa o valor de retorno de uma função com 0
@@ -322,10 +348,6 @@ preProcessing()
 executeFunction("main")
 
 print("stackExecutionSize: ", #stackExecution)
-print("vetor na posição 1: " , stackExecution[1].vectorVariables["a"].values[1])
-printVector(stackExecution[1].vectorVariables["a"].values)
-
-
 
 local pretty = require('pl.pretty')
 pretty.dump(stackExecution)
