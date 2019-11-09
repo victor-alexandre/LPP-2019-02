@@ -17,7 +17,7 @@ end
 --Imprime o conteúdo da tabela de funções
 function printfunctionsTable()
 	for i = 1, #functionsTable do 
-		print(functionsTable[i].name, functionsTable[i].pos)
+		print(functionsTable[i].name, functionsTable[i].pos, functionsTable[i].bodyBegin, functionsTable[i].bodyEnd)
 	end
 end
 
@@ -47,6 +47,16 @@ function removeComments(line)
 	return string.match(line, "[^//]*")
 end
 
+function removeInitialWhiteSpaces(str)
+	--Pego a quantidade inicial de espaços em branco 
+	local initialWhiteSpaces = string.match(str, "^%s*")
+	local finalWhiteSpaces = string.match(str, "%s*$")
+	--Removo os espaços em branco presentes no inicio da string
+	local myStr = string.gsub(str, initialWhiteSpaces, "", 1) 
+	return myStr
+end
+
+
 --Pega o nome da variável seja ela uma variável simples ou um vetor
 function getVariableName(lineNumber)
 	--Pego tudo após a palavra "var" + n characteres em branco até o primeiro caracter "[" (caso ele exista).
@@ -55,19 +65,19 @@ function getVariableName(lineNumber)
 	--debugLine(string.gsub(varName, "%s+", "."))
 	--Removo o "var" + caracteres em branco que restou no inicio da string
 	--local varName = string.gsub(str, "var%s+", "") 
-	local varName = removeReservedWordAndInitialWhiteSpaces("var", str)
+	local varName = removeReservedWordAndAllWhiteSpaces("var", str)
 	return varName
 end
 
 --Pega o valor da variável
 function getVariableValue(lineNumber)
-	local varValue = string.match(progLines[lineNumber], " %d+")
+	local varValue = tonumber( string.match(progLines[lineNumber], " %d+") )
 	return varValue
 end
 
 --Pega o tamanho do vetor que foi declarado
 function getVectorSize(lineNumber)
-	local vectorSize = string.match(progLines[lineNumber], "%[(%d+)%]")
+	local vectorSize = tonumber( string.match(progLines[lineNumber], "%[(%d+)%]") )
 	return vectorSize
 end
 
@@ -87,15 +97,18 @@ function getFunctionName(line)
 	--Pego tudo depois do espaço em branco após a palavra "function" até o primeiro caracter "("
 	local str = string.match(line, "function%s+[^%(]*")
 	--Removo a palavra "function" e os espaços em branco que existirem
-	local functionName = removeReservedWordAndInitialWhiteSpaces("function", str)
+	local functionName = removeReservedWordAndAllWhiteSpaces("function", str)
 	return functionName
 end
 
 
-function removeReservedWordAndInitialWhiteSpaces(reservedWord, str)
-	local regexParameter = reservedWord.."%s+"
-	--debugLine(".."..string.gsub(str, regexParameter, "").."..")
-	return string.gsub(str, regexParameter, "") 
+function removeReservedWordAndAllWhiteSpaces(reservedWord, str)
+	local regexPattern = reservedWord.."%s+"
+	--Removo a palavra reservada (var, function e outras)
+	local wihoutReservedWord = string.gsub(str, regexPattern, "") 
+	local wihoutReservedWordAndWhiteSpace = string.gsub(wihoutReservedWord, "%s*", "") 
+	return wihoutReservedWordAndWhiteSpace
+
 end
 -------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------
@@ -124,8 +137,10 @@ end
 --Salva o arquivo na variavel global progLines. Observe que ele será salvo com os comentários removidos
 function saveFile(file)
 	for line in file do
-		progLines[#progLines + 1] = removeComments(line)
-		--progLines[#progLines + 1] = line
+		local tempStr = removeComments(line)
+		tempStr = removeInitialWhiteSpaces(tempStr)
+		progLines[#progLines + 1] = tempStr
+		--debugLine(tempStr)
 	end
 end
 
@@ -138,11 +153,11 @@ function identifyFunctions()
 	end
 end
 
---Procura a linha onde a função é declarada
-function searchFunctionPositionInFunctionsTable(functionName)
+--Retorna os dados da função presentes na functionsTable
+function getFunctionDataInFunctionsTable(functionName)
 	for i = 1, #functionsTable do 
 		if (functionsTable[i].name == functionName) then
-			return functionsTable[i].pos 
+			return functionsTable[i].pos, functionsTable[i].bodyBegin, functionsTable[i].bodyEnd  
 		end
 	end
 end
@@ -150,12 +165,41 @@ end
 --Executa a função passada como parametro
 function executeFunction(functionName)
 	local stackPosition = #stackExecution + 1
-	local funcPosition = searchFunctionPositionInFunctionsTable(functionName)
+	local funcPosition, bodyBegin, bodyEnd = getFunctionDataInFunctionsTable(functionName)
 
 	-- if isThereParametersInThisFunction(funcPosition) then
 	-- end
+	--declareParameters(funcPosition,stackPosition)
+	--
+	--Inicializando a estrutura da função
+	stackExecution[stackPosition] = {}
+	initializeReturnValue(stackPosition)
 	declareVariables(funcPosition,stackPosition)
+	executeFunctionBody(bodyBegin, bodyEnd)
 
+end
+
+-- Executa o conteúdo presente no corpo da função, observe que esse conteúdo se inicia 1 linha após o "begin" e finaliza 1 linha antes do "end"
+function executeFunctionBody(bodyBegin, bodyEnd)
+	for lineNumber = bodyBegin + 1, bodyEnd - 1 do 
+		if verifyAction(lineNumber) == "attribuition" then
+			resolveAttribuition(lineNumber)
+		elseif verifyAction(lineNumber) == "comparation" then
+			resolveComparation(lineNumber)
+		elseif verifyAction(lineNumber) == "functionCall" then
+			resolveFunctionCall(lineNumber)
+		end
+	end
+end
+
+function verifyAction(lineNumber)
+
+
+end
+
+--Inicializa o valor de retorno de uma função com 0
+function initializeReturnValue(stackPosition)
+	stackExecution[stackPosition]["ret"] = 0
 end
 
 
@@ -164,7 +208,8 @@ function declareVariables(funcPosition, stackPosition)
 	--Se existir variáveis na função elas serão salvas na estrutura presente na stackExecution
 	if (isThereVariablesInThisFunction(funcPosition)) then
 		local simpleVariablesValues, vectorVariablesValues = getVariablesList(funcPosition)
-		stackExecution[stackPosition] = {simpleVariables = simpleVariablesValues, vectorVariables = vectorVariablesValues}
+		stackExecution[stackPosition]["simpleVariables"] = simpleVariablesValues
+		stackExecution[stackPosition]["vectorVariables"] = vectorVariablesValues
 	end
 end
 
@@ -181,8 +226,18 @@ end
 
 --Verifica se a linha atual contém a palavra "begin"
 function isThere_BEGIN_InThisLine(lineNumber)
-	local str = string.match(progLines[lineNumber], "begin")
+	local str = string.match(progLines[lineNumber], "^begin")
 	if (str == "begin") then 
+		return true
+	else
+		return false
+	end	
+end
+
+--Verifica se a linha atual contém a palavra "end"
+function isThere_END_InThisLine(lineNumber)
+	local str = string.match(progLines[lineNumber], "^end")
+	if (str == "end") then 
 		return true
 	else
 		return false
@@ -196,7 +251,7 @@ function getVariablesList(lineNumber)
 	--Se não há "begin" quer dizer que ainda estamos em uma linha que contém as declarações das variáveis
 	while (not isThere_BEGIN_InThisLine(lineNumber)) do
 
-		if (isVariableANumber(lineNumber)) then
+		if isVariableANumber(lineNumber) then
 			local nameField = getVariableName(lineNumber)
 			--Como na declaração da variável não há valor iremos iniciar com 0--Isso está sendo pedido no trabalho
 			local value = 0
@@ -215,12 +270,37 @@ function getVariablesList(lineNumber)
 	return simpleVariables, vectorVariables
 end
 
-
-
 -- function isThereParametersInThisFunction(lineNumber)
 -- 	if
 -- 	return true
 -- end
+
+--Salva na tabela de funções o local de inicio e fim do corpo da função. 
+function identifyBodyFunction()
+	for i = 1, #functionsTable do 
+		local funcPosition = functionsTable[i].pos
+		functionsTable[i]["bodyBegin"] = searchFunctionBody_BEGIN(funcPosition)
+		functionsTable[i]["bodyEnd"] = searchFunctionBody_END(funcPosition)
+	end
+end
+
+--Identifica em qual linha inicia o corpo da função. O início é demarcado pela palavra reservada "begin"
+function searchFunctionBody_BEGIN(funcPosition)
+	for lineNumber = funcPosition, #progLines do
+		if isThere_BEGIN_InThisLine(lineNumber) then
+			return lineNumber
+		end
+	end
+end
+
+--Identifica em qual linha finaliza o corpo da função. O fim é demarcado pela palavra reservada "end"
+function searchFunctionBody_END(funcPosition)
+	for lineNumber = funcPosition, #progLines do
+		if isThere_END_InThisLine(lineNumber) then
+			return lineNumber
+		end
+	end
+end
 
 
 --Faz o pré processmento
@@ -228,7 +308,8 @@ end
 function preProcessing()
 	prepareFile()
 	identifyFunctions()
-	printfunctionsTable()--REMOVER DEPOIS ESSA LINHA******************************************
+	identifyBodyFunction()
+	printfunctionsTable()--REMOVER DEPOIS ESSA LINHA**********************************************************************************
 end
 -------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------
@@ -246,6 +327,10 @@ printVector(stackExecution[1].vectorVariables["a"].values)
 
 
 
-require 'pl.pretty'.dump(stackExecution)
+local pretty = require('pl.pretty')
+pretty.dump(stackExecution)
+pretty.dump(functionsTable)
+pretty.dump(progLines)
+
 -------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------
