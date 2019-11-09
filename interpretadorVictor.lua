@@ -4,58 +4,15 @@ functionsTable = {}
 stackExecution = {}
 -------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------
-
-
--------------------------------Declaração das funções--------------------------------------------------------------------------
---Abre o arquivo e salva ele localmente na variavel global progLines
-function prepareFile()
-	-- Pega o nome do arquivo passado como parâmetro (se houver)
-	local filename = "teste1.bpl"
-	if not filename then
-	   print("Usage: lua interpretador.lua <prog.bpl>")
-	   os.exit(1)
+-------------------------------Declaração das funções Auxiliares---------------------------------------------------------------
+-- Retona um vetor com os valores inicializados com 0's
+function initializeVectorWithZeros(vectorSize)
+	local myVector = {}
+	for i = 1, vectorSize do
+		myVector[i] = 0
 	end
-
-	local file = io.open(filename, "r")
-	if not file then
-	   print(string.format("[ERRO] Cannot open file %q", filename))
-	   os.exit(1)
-	end
-	--Salva o arquivo na variavel global progLines
-	saveFile(file:lines())
-
-	file:close()
-end	
-
---Salva o arquivo na variavel global progLines. Observe que ele será salvo com os comentários removidos
-function saveFile(file)
-	for line in file do
-		progLines[#progLines + 1] = removeComments(line)
-	end
+	return myVector
 end
-
---Procura pelas funções existentes no programa e salva na tabela 
-function identifyFunctions()
-	for i = 1, #progLines do 
-  		if string.find(progLines[i], "function") ~= nil then			
-			functionsTable[#functionsTable + 1] = { ["name"] = getFunctionName(progLines[i]), ["pos"] = i+1}
-		end
-	end
-end
-
-function removeComments(line)
-	return string.match(line, "[^//]*")
-end
-
-function getFunctionName(line)
-	--Pego tudo depois do espaço em branco após a palavra "function" até o primeiro caracter "("
-	local functionName = string.match(line, " [^%(]*")
-	--Removo o espaço em branco que restou no inicio da string 
-	functionName = string.sub(functionName, 2)
-	return functionName
-end
-
-
 
 --Imprime o conteúdo da tabela de funções
 function printfunctionsTable()
@@ -64,84 +21,45 @@ function printfunctionsTable()
 	end
 end
 
---Procura onde a função se inicia 
-function searchFunctionPositionInFunctionsTable(functionName)
-	for i = 1, #functionsTable do 
-		if (functionsTable[i].name == functionName) then
-			return functionsTable[i].pos 
-		end
+--Imprime o conteúdo do vetor
+function printVector(myVector)
+	for i = 1, #myVector do
+		print(myVector[i])
 	end
 end
 
---Executa a função passada como parametro
-function executeFunction(functionName)
-	local stackPosition = #stackExecution + 1
-	local funcPosition = searchFunctionPositionInFunctionsTable(functionName)
+--Verifica se o indice que está tentando ser acessado existe. Caso não exista retornar mensagem de erro.
+function verifyArrayOutBounds()
 
-	-- if isThereParametersInThisFunction(funcPosition) then
-	-- end
-
-	if isThereVariablesInThisFunction(funcPosition+1) then
-		stackExecution[stackPosition].variables = getVariablesNameAndValues(funcPosition+1)
-	end
+	--print("Erro: o índice acessado está fora dos limites do array")
 end
 
---Verifica se a função possui variáveis.
-function isThereVariablesInThisFunction(lineNumber)
-	--Se existir a palavra "begin" quer dizer que não há variáveis locais.
-	if isThereBEGINInThisLine(lineNumber) then
-		return true
-	else
-		return false
-	end
+function debugLine(...)
+	print(...)
 end
 
-function isThere_BEGIN_InThisLine(lineNumber)
-	local str = string.match(progLines[lineNumber], "begin")
-	if (str == "begin") then 
-		return true
-	else
-		return false
-	end	
-end
-
---Retorna uma lista com o nome das variaveis simples e dos vetores (nesse caso salva o tamanho do vetor)
-function getVariablesList(lineNumber)
-	local simpleVariables = {}
-	local vectorVariables ={}
-	local i = lineNumber
-	--Se não há "begin" quer dizer que a contém as declarações das variáveis
-	while (not isThere_BEGIN_InThisLine(i)) do
-
-		if (isVariableANumber(i)) then
-			local nameField = getVariableName(i)
-			--Como na declaração da variável não há valor iremos iniciar com nil
-			local value = nil
-
-			simpleVariables.nameField = value
-			--print(#simpleVariables, simpleVariables.nameField, simpleVariables)
-		else
-			local nameField = getVariableName(i)
-			local vectorSize = getVectorSize(i)
-			
-			vectorVariables.nameField = {size = vectorSize, values = {}}
-			--print(vectorVariables.nameField.size, vectorVariables.nameField.values)
-		end
-
-		i = i + 1
-	end
+-------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------
+-------------------------------Declaração das funções Regex--------------------------------------------------------------------
+--Remove os comenários que estão após o //
+function removeComments(line)
+	--debugLine(string.match(line, "[^//]*"))
+	return string.match(line, "[^//]*")
 end
 
 --Pega o nome da variável seja ela uma variável simples ou um vetor
 function getVariableName(lineNumber)
-	--Pego tudo depois do espaço em branco após a palavra "var" até o primeiro caracter "[" (caso ele exista).
-	local varName = string.match(progLines[lineNumber], "var [^%[]*")
-	--print("linha completa: "..varName)
-	--Removo o "var " que restou no inicio da string 
-	varName = string.sub(varName, 5)
+	--Pego tudo após a palavra "var" + n characteres em branco até o primeiro caracter "[" (caso ele exista).
+	local str = string.match(progLines[lineNumber], "var%s+[^%[]*")
+
+	--debugLine(string.gsub(varName, "%s+", "."))
+	--Removo o "var" + caracteres em branco que restou no inicio da string
+	--local varName = string.gsub(str, "var%s+", "") 
+	local varName = removeReservedWordAndInitialWhiteSpaces("var", str)
 	return varName
 end
 
+--Pega o valor da variável
 function getVariableValue(lineNumber)
 	local varValue = string.match(progLines[lineNumber], " %d+")
 	return varValue
@@ -164,6 +82,141 @@ function isVariableANumber(lineNumber)
 	end
 end
 
+--Pega o nome da função presente na linha
+function getFunctionName(line)
+	--Pego tudo depois do espaço em branco após a palavra "function" até o primeiro caracter "("
+	local str = string.match(line, "function%s+[^%(]*")
+	--Removo a palavra "function" e os espaços em branco que existirem
+	local functionName = removeReservedWordAndInitialWhiteSpaces("function", str)
+	return functionName
+end
+
+
+function removeReservedWordAndInitialWhiteSpaces(reservedWord, str)
+	local regexParameter = reservedWord.."%s+"
+	--debugLine(".."..string.gsub(str, regexParameter, "").."..")
+	return string.gsub(str, regexParameter, "") 
+end
+-------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------
+-------------------------------Declaração das funções Principais---------------------------------------------------------------
+
+--Abre o arquivo e salva ele localmente na variavel global progLines
+function prepareFile()
+	-- Pega o nome do arquivo passado como parâmetro (se houver)
+	local filename = "./testes/teste5.bpl"
+	if not filename then
+	   print("Usage: lua interpretador.lua <prog.bpl>")
+	   os.exit(1)
+	end
+
+	local file = io.open(filename, "r")
+	if not file then
+	   print(string.format("[ERRO] Cannot open file %q", filename))
+	   os.exit(1)
+	end
+	--Salva o arquivo na variavel global progLines
+	saveFile(file:lines())
+
+	file:close()
+end	
+
+--Salva o arquivo na variavel global progLines. Observe que ele será salvo com os comentários removidos
+function saveFile(file)
+	for line in file do
+		progLines[#progLines + 1] = removeComments(line)
+		--progLines[#progLines + 1] = line
+	end
+end
+
+--Procura pelas funções existentes no programa e salva a linha onde elas estão declaradas na "functionsTable"
+function identifyFunctions()
+	for i = 1, #progLines do 
+  		if string.find(progLines[i], "function") ~= nil then			
+			functionsTable[#functionsTable + 1] = { ["name"] = getFunctionName(progLines[i]), ["pos"] = i+1}
+		end
+	end
+end
+
+--Procura a linha onde a função é declarada
+function searchFunctionPositionInFunctionsTable(functionName)
+	for i = 1, #functionsTable do 
+		if (functionsTable[i].name == functionName) then
+			return functionsTable[i].pos 
+		end
+	end
+end
+
+--Executa a função passada como parametro
+function executeFunction(functionName)
+	local stackPosition = #stackExecution + 1
+	local funcPosition = searchFunctionPositionInFunctionsTable(functionName)
+
+	-- if isThereParametersInThisFunction(funcPosition) then
+	-- end
+	declareVariables(funcPosition,stackPosition)
+
+end
+
+
+--Salva as variáveis (na estrutura da função) dentro da stackExecution
+function declareVariables(funcPosition, stackPosition)
+	--Se existir variáveis na função elas serão salvas na estrutura presente na stackExecution
+	if (isThereVariablesInThisFunction(funcPosition)) then
+		local simpleVariablesValues, vectorVariablesValues = getVariablesList(funcPosition)
+		stackExecution[stackPosition] = {simpleVariables = simpleVariablesValues, vectorVariables = vectorVariablesValues}
+	end
+end
+
+
+--Verifica se a função possui variáveis.
+function isThereVariablesInThisFunction(lineNumber)
+	--Se existir a palavra "begin" quer dizer que não há variáveis locais.
+	if (isThere_BEGIN_InThisLine(lineNumber)) then
+		return false
+	else
+		return true
+	end
+end
+
+--Verifica se a linha atual contém a palavra "begin"
+function isThere_BEGIN_InThisLine(lineNumber)
+	local str = string.match(progLines[lineNumber], "begin")
+	if (str == "begin") then 
+		return true
+	else
+		return false
+	end	
+end
+
+--Retorna uma lista com as variáveis(simples e vetores) declaradas e inicializadas com 0's
+function getVariablesList(lineNumber)
+	local simpleVariables = {}
+	local vectorVariables = {}
+	--Se não há "begin" quer dizer que ainda estamos em uma linha que contém as declarações das variáveis
+	while (not isThere_BEGIN_InThisLine(lineNumber)) do
+
+		if (isVariableANumber(lineNumber)) then
+			local nameField = getVariableName(lineNumber)
+			--Como na declaração da variável não há valor iremos iniciar com 0--Isso está sendo pedido no trabalho
+			local value = 0
+			--Os valores serão armazenados em um campo com o nome da variável
+			simpleVariables[nameField] = value
+
+		else
+			local nameField = getVariableName(lineNumber)
+			local vectorSize = getVectorSize(lineNumber)
+			--Como na declaração da variável não há valor iremos iniciar o vetor com 0's--Isso está sendo pedido no trabalho
+			local vectorValues = initializeVectorWithZeros(vectorSize)
+			vectorVariables[nameField] = {size = vectorSize, values = vectorValues}
+		end
+		lineNumber = lineNumber + 1
+	end
+	return simpleVariables, vectorVariables
+end
+
+
+
 -- function isThereParametersInThisFunction(lineNumber)
 -- 	if
 -- 	return true
@@ -175,7 +228,7 @@ end
 function preProcessing()
 	prepareFile()
 	identifyFunctions()
-	printfunctionsTable()
+	printfunctionsTable()--REMOVER DEPOIS ESSA LINHA******************************************
 end
 -------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------
@@ -183,10 +236,16 @@ end
 
 ------------------------Execução do Programa principal-------------------------------------------------------------------------
 preProcessing()
-getVariablesList(2)
-
---executeFunction("main")
 
 
+executeFunction("main")
+
+print("stackExecutionSize: ", #stackExecution)
+print("vetor na posição 1: " , stackExecution[1].vectorVariables["a"].values[1])
+printVector(stackExecution[1].vectorVariables["a"].values)
+
+
+
+require 'pl.pretty'.dump(stackExecution)
 -------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------
