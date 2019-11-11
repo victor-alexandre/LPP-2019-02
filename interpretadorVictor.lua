@@ -217,12 +217,7 @@ function getFunctionDataInFunctionsTable(functionName)
 end
 
 --Executa a função passada como parametro
-function executeFunction(functionName)
-
-	if functionName == "print" then
-		print(args)
-	end
-
+function executeFunction(functionName, param1, param2, param3)
 	local stackPosition = #stackExecution + 1
 	local funcPosition, bodyBegin, bodyEnd = getFunctionDataInFunctionsTable(functionName)
 
@@ -236,7 +231,10 @@ function executeFunction(functionName)
 	declareVariables(funcPosition,stackPosition)
 	executeFunctionBody(bodyBegin, bodyEnd, stackPosition)
 
-	return stackExecution[stackPosition]["ret"]
+	local functionReturn = stackExecution[stackPosition]["ret"]
+	--Removo a função da pilha de Execução
+	stackExecution[stackPosition] = nil
+	return functionReturn
 end
 
 -- Executa o conteúdo presente no corpo da função, observe que esse conteúdo se inicia 1 linha após o "begin" e finaliza 1 linha antes do "end"
@@ -250,7 +248,7 @@ function executeFunctionBody(bodyBegin, bodyEnd, stackPosition)
 			--Resolve comparation vai retornar o numero de linhas que já foi executado dentro dele
 			lineNumber = lineNumber + resolveComparation(lineNumber, stackPosition)
 		elseif verifyAction(lineNumber) == "functionCall" then
-			resolveFunctionCall(lineNumber, stackPosition)
+			resolveFunctionCall(progLines[lineNumber], stackPosition)
 			lineNumber = lineNumber + 1
 		else
 			--Não faz nada, provavelmente leu uma linha em branco do arquivo
@@ -330,7 +328,7 @@ function resolveRightSide(lineNumber, stackPosition)
 			return rightValue
 		end
 	elseif operation == "functionCall" then
-		return resolveFunctionCall(myStr)
+		return resolveFunctionCall(myStr, stackPosition)
 	elseif operation == "+" or operation == "-" or operation == "/" or operation == "*" then
 		print("ENTROU AQUI PELO MENOS")
 		return resolveOperation(lineNumber, stackPosition)
@@ -349,7 +347,7 @@ function resolveOperation(lineNumber, stackPosition)
 		solvedRightValue = rightValue
 	--Se ele for função então devemos resolver ela para pegar o valor
 	elseif isFunction(rightValue) then
-		solvedRightValue = resolveFunctionCall()
+		solvedRightValue = resolveFunctionCall(rightValue, stackPosition)
 	--Se não for nem função nem valor puro então ele é uma variável e o valor dele será buscado dentro da stack
 	else 
 		solvedRightValue = getVariableValueFromStack(rightValue, stackPosition)
@@ -359,7 +357,7 @@ function resolveOperation(lineNumber, stackPosition)
 	if tonumber(leftValue) ~= nil then
 		solvedLeftValue = leftValue
 	elseif isFunction(leftValue) then
-		solvedLeftValue = resolveFunctionCall()
+		solvedLeftValue = resolveFunctionCall(leftValue, stackPosition)
 	else 
 		solvedLeftValue = getVariableValueFromStack(leftValue, stackPosition)
 	end
@@ -413,16 +411,22 @@ end
 
 
 function getVariableValueFromStack(varName, stackPosition)
-	print("String Recebida "..varName)
-	--Verificamos se a variável é um numero ou vetor
-	if isVariableANumber(varName) then
-		return stackExecution[stackPosition].simpleVariables[varName]
+	if varName == nil then
+		--implementar a função que irá procurar essa variavel na pilha
+		--searchVariableInStack(varName, stackPosition)
+		return 
 	else
-		local myVectorVar = getVectorName(varName)
-		local myVectorIndex = getVectorIndex(varName)
-		--Faço as transformações necessárias para gerar um indice válido
-		local newIndex = resolveArrayIndex(myVectorIndex, stackExecution[stackPosition].vectorVariables[myVectorVar].size)
-		return stackExecution[stackPosition].vectorVariables[myVectorVar].values[newIndex]
+		print("String Recebida "..varName)
+		--Verificamos se a variável é um numero ou vetor
+		if isVariableANumber(varName) then
+			return stackExecution[stackPosition].simpleVariables[varName]
+		else
+			local myVectorVar = getVectorName(varName)
+			local myVectorIndex = getVectorIndex(varName)
+			--Faço as transformações necessárias para gerar um indice válido
+			local newIndex = resolveArrayIndex(myVectorIndex, stackExecution[stackPosition].vectorVariables[myVectorVar].size)
+			return stackExecution[stackPosition].vectorVariables[myVectorVar].values[newIndex]
+		end
 	end
 end
 
@@ -543,9 +547,38 @@ function existsElse(lineNumber)
 end
 
 --Resolve chamada de função
-function resolveFunctionCall(str)
+function resolveFunctionCall(str, stackPosition)
 	--Pega o nome da função
-	local funcName = string.match(str, "%s+[^%(]*")
+	local functionName, funcParams = string.match(str, "([^%(]*)%(([^%)]*)")
+
+	local param1, param2, param3 
+
+	--Pego os parametros da função. Se não existir um parametro o valor dele será nil
+	if string.len(funcParams) > 0 then 
+		param1 = string.match(funcParams, "[^,]*")
+		funcParams = string.gsub(funcParams, param1, "", 1)
+		funcParams = string.gsub(funcParams, ",", "", 1)
+	end
+	if string.len(funcParams) > 0 then 
+		param2 = string.match(funcParams, "[^,]*")
+		funcParams = string.gsub(funcParams, param2, "", 1)
+		funcParams = string.gsub(funcParams, ",", "", 1)
+	end
+	if string.len(funcParams) > 0 then
+		param3 = string.match(funcParams, ".*")
+	end
+
+	--Funçao print é especial, ela só recebe um parametro e não precisamos jogar ela na stack, basta printar na tela e pronto
+	if functionName == "print" then
+		print(param1)
+		return
+	end
+
+	local solvedParam1, solvedParam2, solvedParam3 = resolveParameters(param1, param2, param3, stackPosition)
+	--executeFunction(funcName, solvedParam1, solvedParam2, solvedParam3)
+
+	print("NOME DA FUNÇÃO QUE FOI PEDIDA PARA EXECUTAR "..funcName, "FUNC PARAMS "..funcParams, "STRING INICIAL: "..str)
+	print("PARAMETROS: ",param1, param2, param3)
 	return 0
 end
 
@@ -554,6 +587,18 @@ function initializeReturnValue(stackPosition)
 	stackExecution[stackPosition]["ret"] = 0
 end
 
+
+function resolveParameters(param1, param2, param3, stackPosition)
+	local solvedParam1, solvedParam2, solvedParam3
+
+	if tonumber(param1) ~= nil then
+		solvedParam1 = param1
+	else
+		pretty.dump(stackExecution)
+		solvedParam1 = getVariableValueFromStack(param1, stackPosition)
+	end
+	return 
+end
 
 --Salva as variáveis (na estrutura da função) dentro da stackExecution
 function declareVariables(funcPosition, stackPosition)
@@ -575,7 +620,6 @@ function isThereVariablesInThisFunction(lineNumber)
 		return true
 	end
 end
-
 
 
 --Retorna uma lista com as variáveis(simples e vetores) declaradas e inicializadas com 0's
@@ -652,7 +696,7 @@ end
 preProcessing()
 
 
-executeFunction("main")
+executeFunction("main", nil, nil, nil)
 
 print("stackExecutionSize: ", #stackExecution)
 
