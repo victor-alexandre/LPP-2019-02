@@ -1,5 +1,5 @@
 -------------------------------Variaveis globais--------------------------------------------------------------------------------
-pretty = require('pl.pretty')
+--pretty = require('pl.pretty')
 progLines = {}
 functionsTable = {}
 stackExecution = {}
@@ -273,7 +273,6 @@ end
 
 --Resolve atribuição
 function resolveAttribuition(lineNumber, stackPosition)
-	print(progLines[lineNumber], "atribuição")
 	local myLeftVarName, myLeftVarIndex = resolveLeftSide(lineNumber)
 	local myRightValue = resolveRightSide(lineNumber, stackPosition)
 
@@ -330,7 +329,6 @@ function resolveRightSide(lineNumber, stackPosition)
 	elseif operation == "functionCall" then
 		return resolveFunctionCall(myStr, stackPosition)
 	elseif operation == "+" or operation == "-" or operation == "/" or operation == "*" then
-		print("ENTROU AQUI PELO MENOS")
 		return resolveOperation(lineNumber, stackPosition)
 	end	
 end
@@ -416,7 +414,6 @@ function getVariableValueFromStack(varName, stackPosition)
 		--searchVariableInStack(varName, stackPosition)
 		return 
 	else
-		print("String Recebida "..varName)
 		--Verificamos se a variável é um numero ou vetor
 		if isVariableANumber(varName) then
 			return stackExecution[stackPosition].simpleVariables[varName]
@@ -568,17 +565,15 @@ function resolveFunctionCall(str, stackPosition)
 		param3 = string.match(funcParams, ".*")
 	end
 
+	local solvedParam1, solvedParam2, solvedParam3 = resolveParameters(param1, param2, param3, stackPosition)
+	--executeFunction(funcName, solvedParam1, solvedParam2, solvedParam3)
+
 	--Funçao print é especial, ela só recebe um parametro e não precisamos jogar ela na stack, basta printar na tela e pronto
 	if functionName == "print" then
 		print(param1)
 		return
 	end
 
-	local solvedParam1, solvedParam2, solvedParam3 = resolveParameters(param1, param2, param3, stackPosition)
-	--executeFunction(funcName, solvedParam1, solvedParam2, solvedParam3)
-
-	print("NOME DA FUNÇÃO QUE FOI PEDIDA PARA EXECUTAR "..funcName, "FUNC PARAMS "..funcParams, "STRING INICIAL: "..str)
-	print("PARAMETROS: ",param1, param2, param3)
 	return 0
 end
 
@@ -594,7 +589,7 @@ function resolveParameters(param1, param2, param3, stackPosition)
 	if tonumber(param1) ~= nil then
 		solvedParam1 = param1
 	else
-		pretty.dump(stackExecution)
+		--pretty.dump(stackExecution)
 		solvedParam1 = getVariableValueFromStack(param1, stackPosition)
 	end
 	return 
@@ -694,15 +689,13 @@ end
 
 ------------------------Execução do Programa principal-------------------------------------------------------------------------
 preProcessing()
-
-
 executeFunction("main", nil, nil, nil)
 
-print("stackExecutionSize: ", #stackExecution)
+--print("stackExecutionSize: ", #stackExecution)
 
 
-pretty.dump(functionsTable)
-pretty.dump(stackExecution)
+--pretty.dump(functionsTable)
+--pretty.dump(stackExecution)
 --pretty.dump(functionsTable)
 --pretty.dump(progLines)
 
