@@ -1,5 +1,5 @@
 -------------------------------Variaveis globais--------------------------------------------------------------------------------
---pretty = require('pl.pretty')
+pretty = require('pl.pretty')
 progLines = {}
 functionsTable = {}
 stackExecution = {}
@@ -147,6 +147,7 @@ end
 
 --Verifica se a linha atual contém a palavra "begin"
 function isThere_BEGIN_InThisLine(lineNumber)
+	print(progLines[lineNumber], lineNumber)
 	local str = string.match(progLines[lineNumber], "^begin")
 	if (str == "begin") then 
 		return true
@@ -217,7 +218,7 @@ function getFunctionDataInFunctionsTable(functionName)
 end
 
 --Executa a função passada como parametro
-function executeFunction(functionName, param1, param2, param3)
+function executeFunction(functionName)
 	local stackPosition = #stackExecution + 1
 	local funcPosition, bodyBegin, bodyEnd = getFunctionDataInFunctionsTable(functionName)
 
@@ -227,15 +228,22 @@ function executeFunction(functionName, param1, param2, param3)
 	--
 	--Inicializando a estrutura da função
 	stackExecution[stackPosition] = {}
-	initializeReturnValue(stackPosition)
+	--declara as variáveis e inicializa o retorno com 0
 	declareVariables(funcPosition,stackPosition)
+	--Inicializo o campo dos parametros
+	stackExecution[stackPosition]["parameters"] = {}
+
 	executeFunctionBody(bodyBegin, bodyEnd, stackPosition)
 
-	local functionReturn = stackExecution[stackPosition]["ret"]
+	local functionReturn = stackExecution[stackPosition]["simpleVariables"]["ret"]
 	--Removo a função da pilha de Execução
-	stackExecution[stackPosition] = nil
+	--stackExecution[stackPosition] = nil
 	return functionReturn
 end
+
+
+
+
 
 -- Executa o conteúdo presente no corpo da função, observe que esse conteúdo se inicia 1 linha após o "begin" e finaliza 1 linha antes do "end"
 function executeFunctionBody(bodyBegin, bodyEnd, stackPosition)
@@ -248,7 +256,8 @@ function executeFunctionBody(bodyBegin, bodyEnd, stackPosition)
 			--Resolve comparation vai retornar o numero de linhas que já foi executado dentro dele
 			lineNumber = lineNumber + resolveComparation(lineNumber, stackPosition)
 		elseif verifyAction(lineNumber) == "functionCall" then
-			resolveFunctionCall(progLines[lineNumber], stackPosition)
+			local functionName = string.match(progLines[lineNumber], " [^%(]*")
+			resolveFunctionCall(functionName, stackPosition)
 			lineNumber = lineNumber + 1
 		else
 			--Não faz nada, provavelmente leu uma linha em branco do arquivo
@@ -327,7 +336,8 @@ function resolveRightSide(lineNumber, stackPosition)
 			return rightValue
 		end
 	elseif operation == "functionCall" then
-		return resolveFunctionCall(myStr, stackPosition)
+		local functionName = string.match(myStr, " [^%(]*")
+		return resolveFunctionCall(functionName, stackPosition)
 	elseif operation == "+" or operation == "-" or operation == "/" or operation == "*" then
 		return resolveOperation(lineNumber, stackPosition)
 	end	
@@ -381,50 +391,84 @@ function isFunction(str)
 	end
 end
 
--- function resolveSum(leftValue, rightValue, lineNumber, stackPosition)
--- 	local solvedRightValue, solvedLeftValue
--- 	--Se ele for um número então ele será usado diretamente se não o valor dele será buscado dentro da stack
--- 	if tonumber(rightValue) ~= nil then
--- 		solvedRightValue = rightValue
--- 	--Se ele for função então devemos resolver ela para pegar o valor
--- 	elseif isFunction(rightValue) then
--- 		solvedRightValue = resolveFunctionCall()
--- 	--Se não for nem função nem valor puro então ele é uma variável e o valor dele será buscado dentro da stack
--- 	else 
--- 		solvedRightValue = getVariableValueFromStack(rightValue, stackPosition)
--- 	end
+function isParameter(varName, stackPosition)
+	if stackExecution[stackPosition].parameters[varName] == nil then
+		return false
+	else
+		return true
+	end
+end
 
--- 	if tonumber(leftValue) ~= nil then
--- 		solvedLeftValue = leftValue
--- 	elseif isFunction(leftValue) then
--- 		solvedLeftValue = resolveFunctionCall()
--- 	else 
--- 		solvedLeftValue = getVariableValueFromStack(leftValue, stackPosition)
--- 	end
+--retorna a posição da stack em que a variável foi encontrada, e caso não encontrada retorna nulo
+function searchSimpleVariableInStack(varName, stackPosition)
+	if stackPosition == 0 then
+		return nil
+	end
+	if verifySimpleVariableExistence(varName, stackPosition) then
+		return stackPosition
+	else
+		return searchSimpleVariableInStack(varName, stackPosition - 1)
+	end
+end
 
--- 	return math.floor(solvedLeftValue + solvedRightValue)
--- end
+--Verifica se a variavel existe em uma posição específica da stack
+function verifySimpleVariableExistence(varName, stackPosition)
+	return stackExecution[stackPosition].simpleVariables[varName] ~= nil
+end
 
 
+
+--retorna a posição da stack em que a variável foi encontrada, e caso não encontrada retorna nulo
+function searchVectorVariableInStack(vectorName, stackPosition)
+	if stackPosition == 0 then
+		return nil
+	end
+	if verifyVectorVariableExistence(varName, stackPosition) then
+		return stackPosition
+	else
+		return searchVectorVariableInStack(varName, stackPosition - 1)
+	end
+end
+
+--Verifica se a variavel existe em uma posição específica da stack
+function verifyVectorVariableExistence(vectorName, stackPosition)
+	return stackExecution[stackPosition].vectorVariables[vectorName] ~= nil
+end
+
+--Verifica se a variavel existe em uma posição específica da stack
+function verifyParameterExistence(param, stackPosition)
+	return stackExecution[stackPosition].parameters[param] ~= nil 
+end
 
 
 function getVariableValueFromStack(varName, stackPosition)
 	if varName == nil then
 		--implementar a função que irá procurar essa variavel na pilha
-		--searchVariableInStack(varName, stackPosition)
 		return 
 	else
 		--Verificamos se a variável é um numero ou vetor
 		if isVariableANumber(varName) then
-			return stackExecution[stackPosition].simpleVariables[varName]
+			--Verificamos primeiramente se é um parâmetro e retornamos o valor dele
+			if verifyParameterExistence(varName, stackPosition) then
+				return stackExecution[stackPosition].parameters[varName]
+			end
+			--Se não é um parametro então devemos procurar pelas variáveis
+			local variableLocalization = searchSimpleVariableInStack(varName, stackPosition)
+			if variableLocalization ~= nil  then
+				return stackExecution[variableLocalization].simpleVariables[varName]
+			end
+		--Se for um vetor então resolvemos o índice e pegamos o valor dentro desse local
 		else
 			local myVectorVar = getVectorName(varName)
 			local myVectorIndex = getVectorIndex(varName)
+			local vectorLocalization = searchVectorVariableInStack(varName, stackPosition)
 			--Faço as transformações necessárias para gerar um indice válido
-			local newIndex = resolveArrayIndex(myVectorIndex, stackExecution[stackPosition].vectorVariables[myVectorVar].size)
-			return stackExecution[stackPosition].vectorVariables[myVectorVar].values[newIndex]
+			local newIndex = resolveArrayIndex(myVectorIndex, stackExecution[vectorLocalization].vectorVariables[myVectorVar].size)
+			return stackExecution[vectorLocalization].vectorVariables[myVectorVar].values[newIndex]
 		end
 	end
+	--se der tudo errado retorna nil
+	return nil
 end
 
 
@@ -547,61 +591,86 @@ end
 function resolveFunctionCall(str, stackPosition)
 	--Pega o nome da função
 	local functionName, funcParams = string.match(str, "([^%(]*)%(([^%)]*)")
+	print(functionName)
 
 	local param1, param2, param3 
 
 	--Pego os parametros da função. Se não existir um parametro o valor dele será nil
-	if string.len(funcParams) > 0 then 
-		param1 = string.match(funcParams, "[^,]*")
-		funcParams = string.gsub(funcParams, param1, "", 1)
-		funcParams = string.gsub(funcParams, ",", "", 1)
-	end
-	if string.len(funcParams) > 0 then 
-		param2 = string.match(funcParams, "[^,]*")
-		funcParams = string.gsub(funcParams, param2, "", 1)
-		funcParams = string.gsub(funcParams, ",", "", 1)
-	end
-	if string.len(funcParams) > 0 then
-		param3 = string.match(funcParams, ".*")
+	if funcParams ~= nil then
+		if string.len(funcParams) > 0 then 
+			param1 = string.match(funcParams, "[^,]*")
+			funcParams = string.gsub(funcParams, param1, "", 1)
+			funcParams = string.gsub(funcParams, ",", "", 1)
+		end
+		if string.len(funcParams) > 0 then 
+			param2 = string.match(funcParams, "[^,]*")
+			funcParams = string.gsub(funcParams, param2, "", 1)
+			funcParams = string.gsub(funcParams, ",", "", 1)
+		end
+		if string.len(funcParams) > 0 then
+			param3 = string.match(funcParams, ".*")
+		end
 	end
 
-	local solvedParam1, solvedParam2, solvedParam3 = resolveParameters(param1, param2, param3, stackPosition)
+	local solvedParam1 = resolveParameter(param1, stackPosition, functionName)
+	local solvedParam2 = resolveParameter(param2, stackPosition, functionName)
+	local solvedParam3 = resolveParameter(param3, stackPosition, functionName)
 	--executeFunction(funcName, solvedParam1, solvedParam2, solvedParam3)
 
 	--Funçao print é especial, ela só recebe um parametro e não precisamos jogar ela na stack, basta printar na tela e pronto
 	if functionName == "print" then
-		print(param1)
+		print(solvedParam1)
 		return
-	end
-
-	return 0
-end
-
---Inicializa o valor de retorno de uma função com 0
-function initializeReturnValue(stackPosition)
-	stackExecution[stackPosition]["ret"] = 0
-end
-
-
-function resolveParameters(param1, param2, param3, stackPosition)
-	local solvedParam1, solvedParam2, solvedParam3
-
-	if tonumber(param1) ~= nil then
-		solvedParam1 = param1
 	else
-		--pretty.dump(stackExecution)
-		solvedParam1 = getVariableValueFromStack(param1, stackPosition)
+		executeFunction(functionName)
 	end
-	return 
+end
+
+
+
+function resolveParameter(param, stackPosition, functionName)
+	local solvedParam
+
+	--Se for um número então podemos passar ele diretamente
+	if tonumber(param) ~= nil then
+		solvedParam = param
+	-- --Obs: se for algo do tipo a[0], então isso é um valor, então devemos resolver esse valor
+	-- elseif string.find(param, "%[") ~= nil then
+	-- 	solvedParam = getVariableValueFromStack(param, stackPosition)
+	--Se ele for uma variável devemos salvar uma referencia dela, para podermos usar ela no resto do corpo, antes de resolver o valor dela
+	elseif param ~= nil then
+		solvedParam = getVariableValueFromStack(param, stackPosition)
+		--Só salvaremos os parametros caso não seja a função print
+		if functionName ~= "print" then
+			declareAndSaveParameter(param, solvedParam, stackPosition)
+		end
+	end
+	return solvedParam
+end
+
+
+function declareAndSaveParameter(paramName, paramValue, stackPosition)
+	stackExecution[stackPosition]["parameters"][paramName] = paramValue
 end
 
 --Salva as variáveis (na estrutura da função) dentro da stackExecution
 function declareVariables(funcPosition, stackPosition)
+	local i = 0
 	--Se existir variáveis na função elas serão salvas na estrutura presente na stackExecution
 	if (isThereVariablesInThisFunction(funcPosition)) then
 		local simpleVariablesValues, vectorVariablesValues = getVariablesList(funcPosition)
 		stackExecution[stackPosition]["simpleVariables"] = simpleVariablesValues
 		stackExecution[stackPosition]["vectorVariables"] = vectorVariablesValues
+		i = i + 1
+	end
+	--Salvarei o retorno da função como uma variável simples
+	--Se i == 0 preciso criar a lista vazia antes de atribuir o valor do retorno
+	if i == 0 then
+		stackExecution[stackPosition]["simpleVariables"] = {}
+		stackExecution[stackPosition]["simpleVariables"]["ret"] = 0 
+	--Senão eu posso simplesmente fazer a atribuição diretamente, pois a lista já existe
+	else
+		stackExecution[stackPosition]["simpleVariables"]["ret"] = 0
 	end
 end
 
@@ -689,15 +758,12 @@ end
 
 ------------------------Execução do Programa principal-------------------------------------------------------------------------
 preProcessing()
-executeFunction("main", nil, nil, nil)
 
---print("stackExecutionSize: ", #stackExecution)
+pretty.dump(functionsTable)
+pretty.dump(stackExecution)
 
+executeFunction("main")
 
---pretty.dump(functionsTable)
---pretty.dump(stackExecution)
---pretty.dump(functionsTable)
---pretty.dump(progLines)
 
 -------------------------------------------------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------
