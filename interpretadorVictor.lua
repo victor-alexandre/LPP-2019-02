@@ -253,7 +253,8 @@ function executeFunctionBody(bodyBegin, bodyEnd, stackPosition)
 			resolveFunctionCall(lineNumber, stackPosition)
 			lineNumber = lineNumber + 1
 		else
-			--print("Erro na execução do corpo")
+			--Não faz nada, provavelmente leu uma linha em branco do arquivo
+			lineNumber = lineNumber + 1
 		end
 	end
 end
@@ -464,7 +465,7 @@ end
 function resolveComparation(lineNumber, stackPosition)
 	local ifWord, leftValue, lixo, comparationSimbol, lixo2, rightValue  = string.match(progLines[lineNumber], "(if%s+)([^%s]*)(%s+)([^%s]*)(%s+)([^%s]*)")
 	local solvedLeftValue, solvedRightValue
-	print(string.match(progLines[lineNumber], "(if%s+)([^%s]*)(%s+)([^%s]*)(%s+)([^%s]*)"))
+	--print(string.match(progLines[lineNumber], "(if%s+)([^%s]*)(%s+)([^%s]*)(%s+)([^%s]*)"))
 
 	--Resolvemos o lado esquerdo da comparação
 	if tonumber(leftValue) ~= nil then
@@ -480,11 +481,10 @@ function resolveComparation(lineNumber, stackPosition)
 		solvedRightValue = getVariableValueFromStack(rightValue, stackPosition)
 	end
 
-
 	--Se for verdadeiro executa o comando dentro do corpo do if
 	if comparationSimbol == "==" and solvedLeftValue == solvedRightValue then
 		resolveAttribuition(lineNumber+1, stackPosition)
-	elseif comparationSimbol == "==" and (not solvedLeftValue == solvedRightValue) then 
+	elseif comparationSimbol == "==" and not (solvedLeftValue == solvedRightValue) then 
 		--verifica se tem else, se sim executa o comando dentro do corpo do else
 		if existsElse(lineNumber+2) then
 			resolveAttribuition(lineNumber+3, stackPosition)
@@ -492,34 +492,34 @@ function resolveComparation(lineNumber, stackPosition)
 	--------------------------------------------------------------------------
 	elseif comparationSimbol == "!=" and solvedLeftValue ~= solvedRightValue then
 		resolveAttribuition(lineNumber+1, stackPosition)
-	elseif comparationSimbol == "!=" and (not solvedLeftValue ~= solvedRightValue) then 
+	elseif comparationSimbol == "!=" and not (solvedLeftValue ~= solvedRightValue) then 
 		if existsElse(lineNumber+2) then
 			resolveAttribuition(lineNumber+3, stackPosition)
 		end			
 	--------------------------------------------------------------------------
 	elseif comparationSimbol == "<" and solvedLeftValue < solvedRightValue then
 		resolveAttribuition(lineNumber+1, stackPosition)
-	elseif comparationSimbol == "<" and (not solvedLeftValue < solvedRightValue) then 
+	elseif comparationSimbol == "<" and not (solvedLeftValue < solvedRightValue) then 
 		if existsElse(lineNumber+2) then
 			resolveAttribuition(lineNumber+3, stackPosition)
 		end		
 	--------------------------------------------------------------------------
 	elseif comparationSimbol == "<=" and solvedLeftValue <= solvedRightValue then
 		resolveAttribuition(lineNumber+1, stackPosition)
-	elseif comparationSimbol == "<=" and (not solvedLeftValue <= solvedRightValue) then 
+	elseif comparationSimbol == "<=" and not (solvedLeftValue <= solvedRightValue) then 
 		if existsElse(lineNumber+2) then
 			resolveAttribuition(lineNumber+3, stackPosition)
 		end	
 	---------------------------------------------------------------------------
 	elseif comparationSimbol == ">" and solvedLeftValue > solvedRightValue then
 		resolveAttribuition(lineNumber+1, stackPosition)
-	elseif comparationSimbol == ">" and (not solvedLeftValue > solvedRightValue) then 
+	elseif comparationSimbol == ">" and not (solvedLeftValue > solvedRightValue) then 
 		if existsElse(lineNumber+2) then
 			resolveAttribuition(lineNumber+3, stackPosition)
 		end		
 	elseif comparationSimbol == ">=" and solvedLeftValue >= solvedRightValue then
 		resolveAttribuition(lineNumber+1, stackPosition)
-	elseif comparationSimbol == ">=" and (not solvedLeftValue >= solvedRightValue) then 
+	elseif comparationSimbol == ">=" and not (solvedLeftValue >= solvedRightValue) then 
 		if existsElse(lineNumber+2) then
 			resolveAttribuition(lineNumber+3, stackPosition)
 		end	
